@@ -88,7 +88,7 @@ Disable
 
 dtparam=i2c_arm=on
 dtparam=spi=on
-dtparam=enable_uart=1
+enable_uart=1
 
 dtoverlay=dwc2,dr_mode=host
 dtoverlay=vc4-kms-v3d
