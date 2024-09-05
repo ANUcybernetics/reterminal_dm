@@ -82,6 +82,15 @@ Disable
 
 # reComputer r100x
 
+## Hardware
+
+* i2c
+* rtc
+* buzzer
+* accelerometer
+* light sensor
+* backlight 
+
 ## cmdline.txt
 
 ## config.txt   
