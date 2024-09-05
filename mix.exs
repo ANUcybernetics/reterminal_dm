@@ -111,6 +111,8 @@ defmodule NervesSystemRpi4.MixProject do
       "linux-6.6.defconfig",
       "mix.exs",
       "nerves_defconfig",
+      "Config.in",
+      "busybox_defconfig",
       "post-build.sh",
       "post-createfs.sh",
       "ramoops.dts",
