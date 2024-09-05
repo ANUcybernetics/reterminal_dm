@@ -2,9 +2,10 @@
 
 ## cmdline.txt  
 
-logo.nologo vt.global_cursor_default=0 console=tty0 loglevel=0
+dwc_otg.lpm_enable=0 logo.nologo console=tty3 console=serial0,115200 fbcon=scrollback:1024k root=/dev/mmcblk0p2 rootfstype=squashfs quiet rootwait vt.global_cursor_default=0 loglevel=0 splash video=DSI-1:720x1280@60,rotate=270 swiotlb=262144
 
 ## config.txt   
+
 
 i2c_arm=on
 enable_uart=1
@@ -18,7 +19,7 @@ gpio=13=pu
 dtoverlay=reTerminal,tp_rotate=1
 
 
-## Modules
+## Supported Modules
 
 mipi_dsi
 ltr30x
@@ -33,10 +34,7 @@ bq24179_charger
 
 ## cmdline.txt
 
-logo.nologo 
-vt.global_cursor_default=0
-console=tty3
-loglevel=0
+dwc_otg.lpm_enable=0 logo.nologo console=tty3 console=serial0,115200 fbcon=scrollback:1024k root=/dev/mmcblk0p2 rootfstype=squashfs quiet rootwait vt.global_cursor_default=0 loglevel=0 splash video=DSI-1:800x1280@60,rotate=270 swiotlb=262144
 
 ## config.txt   
 
@@ -65,14 +63,14 @@ dtoverlay=reTerminal,tp_rotate=1
 dtoverlay=reTerminal-bridge
 
 
-## Modules
+## Supported Modules
 
 * ltr30x
 * ili9881d
 * ch34x
 * rtc-pcf8563w
 
-Disable 
+## Disable 
 
 * cdc_acm
 
@@ -93,6 +91,8 @@ Disable
 
 ## cmdline.txt
 
+dwc_otg.lpm_enable=0 logo.nologo console=tty3 console=serial0,115200 fbcon=scrollback:1024k root=/dev/mmcblk0p2 rootfstype=squashfs quiet rootwait vt.global_cursor_default=0 loglevel=0 splash swiotlb=262144
+
 ## config.txt   
 
 dtparam=i2c_arm=on
@@ -108,7 +108,7 @@ dtoverlay=i2c6,pins_22_23
 
 dtoverlay=reComputer-R100x,uart2
 
-## Modules
+## Supported Modules
 
 rtc-pcf8563w
 
