@@ -1,5 +1,5 @@
 menuconfig BR2_PACKAGE_RETERMINAL_DM
-	bool "reterminal-dm"
+	bool "rethings"
 	select BR2_PACKAGE_HOST_DTC
 	help
-	  Reterminal DM DTS files that may be useful on Nerves systems.
+	  Seeed Studio reTerminal/ reTerminal DM and reComputer r100x DTS files that may be useful on Nerves systems.
