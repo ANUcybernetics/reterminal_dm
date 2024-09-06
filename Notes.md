@@ -82,6 +82,7 @@ dtoverlay=reTerminal-bridge
 
 ## Hardware
 
+* NVMe SSD 
 * i2c
 * rtc
     pin 6
