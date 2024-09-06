@@ -84,10 +84,20 @@ dtoverlay=reTerminal-bridge
 
 * i2c
 * rtc
-* buzzer
+    pin 6
+* buzzer (pin 21)
+    gpioset gpiochip0 21=1
 * accelerometer
 * light sensor
 * backlight 
+* security chip infineon slb9670
+    spi
+* led
+    each color is on one pin
+    1=off, 0=on
+    red: 20
+    green: 26
+    blue: 27
 
 ## cmdline.txt
 
