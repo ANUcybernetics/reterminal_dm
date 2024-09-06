@@ -89,7 +89,6 @@ dtoverlay=reTerminal-bridge
     gpioset gpiochip0 21=1
 * accelerometer
 * light sensor
-* backlight 
 * security chip infineon slb9670
     spi
 * led
