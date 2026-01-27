@@ -1,20 +1,90 @@
+# reThings
+
+# This file contains 4 Parts:
+# 1. Settings for all reThings
+# 2.-4 Settings for a specific device
+# The reTerminal DM is enabled by default.
+# Please enable/disable the other devices as needed.
+# Only one block may be active at a time.
+
+# It's better to have custom config.txt and cmdlime.txt files
+# in your project instead of forking the base image and
+# recompiling the image:
+
+# https://hexdocs.pm/nerves/advanced-configuration.html#overwriting-files-in-the-boot-partition
+
+# Docs:
+# dtparam=ant2 - Use the external antenna of the CM4 (ant1 is the internal one)
+
+
+
+# 1. Settings or all reThings ##############
+
 arm_64bit=1
 start_file=start4.elf
 fixup_file=fixup4.dat
 
-# Max for cm4
-over_voltage=6
-arm_freq=2147
-gpu_freq=750
+gpu_mem=512
 
-arm_boost=1 # Don't have the firmware create an initial video= setting in cmdline.txt.
-# Use the kernel's default instead.
-#disable_fw_kms_setup=1
-#disable_overscan=1
-hdmi_enable_4kp60=1
+# Optional Overclocking: Max for cm4
+# https://www.jeffgeerling.com/blog/2020/overclocking-raspberry-pi-compute-module-4
 
-# MIPI
+# over_voltage=6
+# arm_freq=2147
+# gpu_freq=750
+# arm_boost=1 
+
+# Optional HDMI:
+# If your device does not use external HDMI, skip over
+# the search for a display to speed up boot time.
+# disable_fw_kms_setup=1
+# disable_overscan=1
+# hdmi_enable_4kp60=1
+
+
+
+
+
+### 2. reTerminal ##################################
+
+# dtparam=i2c_arm=on
+
+# enable_uart=1
+# dtoverlay=dwc2,dr_mode=host
+# dtparam=ant2
+# disable_splash=1
+# ignore_lcd=1
+
+# dtoverlay=vc4-kms-v3d-pi4
+# dtoverlay=i2c3,pins_4_5
+# gpio=13=pu
+# dtoverlay=reTerminal,tp_rotate=1
+
+
+
+
+### 2. reComputer r100x ############################
+
+# dtparam=i2c_arm=on
+# dtparam=spi=on
+# enable_uart=1
+
+# dtoverlay=dwc2,dr_mode=host
+# dtoverlay=vc4-kms-v3d,cma-256 
+# dtoverlay=audremap,pins_18_19
+# dtoverlay=i2c1,pins_44_45
+# dtoverlay=i2c3,pins_2_3
+# dtoverlay=i2c6,pins_22_23
+
+# dtoverlay=reComputer-R100x,uart2
+
+
+
+
+### 3. reTerminal DM ###############################
+
 dtparam=i2c_arm=on
+dtparam=i2c_vc=on
 dtparam=i2s=on
 dtparam=spi=on
 dtparam=audio=on
@@ -28,20 +98,17 @@ dtparam=i2c_vc=on
 dtparam=ant2
 disable_splash=1
 ignore_lcd=1
-#lcd_rotate=2
-#display_lcd_rotate=1
 
 dtoverlay=dwc2,dr_mode=host
-
-gpu_mem=512
-dtoverlay=vc4-kms-v3d-pi4,cma-512
+dtoverlay=vc4-kms-v3d,cma-256 
 dtoverlay=i2c1,pins_2_3
 dtoverlay=i2c3,pins_4_5
 dtoverlay=imx219,cam0
-dtoverlay=ramoops
-dtparam=i2c0=on
-dtparam=i2c1=on
-dtparam=i2c1=on
-dtparam=i2c3=on
-gpio=13=pu
-dtoverlay=reTerminal-plus,tp_rotate=1
+
+# dtoverlay=ramoops
+# dtparam=i2c0=on
+# dtparam=i2c1=on
+# dtparam=i2c1=on
+# dtparam=i2c3=on
+
+dtoverlay=reTerminal-plus

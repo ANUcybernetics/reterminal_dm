@@ -21,7 +21,6 @@ endef
 define RETERMINAL_DM_INSTALL_TARGET_CMDS
 	echo "$(@D)/*.dtbo -> $(BINARIES_DIR)/rpi-firmware/overlays/"
 	$(INSTALL) -D -m 0644 $(@D)/*.dtbo $(BINARIES_DIR)/rpi-firmware/overlays/
-
 endef
 
 $(eval $(generic-package))
