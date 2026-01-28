@@ -6,11 +6,13 @@
 
 # Remember to bump the version when anything changes in this
 # directory.
-RETERMINAL_DM_SOURCE =
-RETERMINAL_DM_VERSION = 0.0.1
-RETERMINAL_DM_DEPENDENCIES += host-dtc
+RETHINGS_SOURCE =
+RETHINGS_VERSION = 0.0.1
+RETHINGS_DEPENDENCIES += host-dtc
 
-define RETERMINAL_DM_BUILD_CMDS
+
+define RETHINGS_BUILD_CMDS
+	echo "123"
 	cp $(NERVES_DEFCONFIG_DIR)/package/rethings/*.dts* $(@D)
         for filename in $(@D)/*.dts; do \
             $(CPP) -I$(@D) -I $(LINUX_SRCDIR)include -I $(LINUX_SRCDIR)arch -nostdinc -undef -D__DTS__ -x assembler-with-cpp $$filename | \
@@ -18,7 +20,7 @@ define RETERMINAL_DM_BUILD_CMDS
         done
 endef
 
-define RETERMINAL_DM_INSTALL_TARGET_CMDS
+define RETHINGS_INSTALL_TARGET_CMDS
 	echo "$(@D)/*.dtbo -> $(BINARIES_DIR)/rpi-firmware/overlays/"
 	$(INSTALL) -D -m 0644 $(@D)/*.dtbo $(BINARIES_DIR)/rpi-firmware/overlays/
 endef
