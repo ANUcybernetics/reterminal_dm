@@ -111,4 +111,4 @@ dtoverlay=imx219,cam0
 # dtparam=i2c1=on
 # dtparam=i2c3=on
 
-dtoverlay=reTerminal-plus
+dtoverlay=reTerminal-DM

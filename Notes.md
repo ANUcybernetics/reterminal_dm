@@ -55,7 +55,7 @@ dtoverlay=i2c1,pins_2_3
 dtoverlay=i2c3,pins_4_5
 dtoverlay=imx219,cam0
 
-dtoverlay=reTerminal-plus
+dtoverlay=reTerminal-DM
 
 // comment old values
 gpio=13=pu
