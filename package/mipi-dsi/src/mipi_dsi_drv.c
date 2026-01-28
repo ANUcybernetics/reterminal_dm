@@ -11,6 +11,27 @@
 #include "mipi_dsi.h"
 #include <linux/version.h>
 
+static int dsi_status = DSI_OK; //0:dsi is ok, not 0:something wrong with dsi
+static ssize_t dsi_state_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	if (!dsi_status)
+		return scnprintf(buf, PAGE_SIZE, "ok\r\n");
+	else
+		return scnprintf(buf, PAGE_SIZE, "error : %d\r\n", dsi_status);
+}
+
+static DEVICE_ATTR(dsi_state, 0444, dsi_state_show, NULL);
+
+static struct attribute *dsi_state_attrs[] = {
+	&dev_attr_dsi_state.attr,
+	NULL
+};
+
+static const struct attribute_group dsi_attr_group = {
+	.attrs = dsi_state_attrs,
+};
+
 /*static */int i2c_md_read(struct i2c_mipi_dsi *md, u8 reg, u8 *buf, int len)
 {
 	struct i2c_client *client = md->i2c;
@@ -84,13 +105,14 @@ static int mipi_dsi_probe(struct mipi_dsi_device *dsi)
 
 	DBG_PRINT("Probe MIPI-DSI driver");
 
-	dsi->mode_flags = MIPI_DSI_MODE_VIDEO;
+	dsi->mode_flags = MIPI_DSI_MODE_VIDEO | MIPI_DSI_MODE_LPM;
 	dsi->format = MIPI_DSI_FMT_RGB888;
 	dsi->lanes = 4;
 
 	ret = mipi_dsi_attach(dsi);
 	if (ret) {
 		dev_err(&dsi->dev, "failed to attach dsi to host: %d\n", ret);
+		dsi_status = DSI_ATTACH_ERR;
 	}
 
 	return ret;
@@ -148,6 +170,7 @@ static struct mipi_dsi_device *mipi_dsi_device(struct device *dev)
 	dsi = mipi_dsi_device_register_full(host, &info);
 	if(IS_ERR(dsi)) {
 		dev_err(dev, "Can't device register_full!");
+		dsi_status = DSI_REG_ERR;
 		return dsi;
 	}
 
@@ -171,10 +194,12 @@ static int panel_prepare(struct drm_panel *panel)
 
 	/* i2c */
 	/* reset pin */
+	i2c_md_write(md, REG_POWERON, 1);
+	msleep(20);
 	i2c_md_write(md, REG_LCD_RST, 0);
 	msleep(20);
 	i2c_md_write(md, REG_LCD_RST, 1);
-	msleep(20);
+	msleep(50);
 
 	/* panel */
 	if (funcs && funcs->prepare) {
@@ -183,10 +208,10 @@ static int panel_prepare(struct drm_panel *panel)
 			i2c_md_write(md, REG_POWERON, 0);
 			i2c_md_write(md, REG_LCD_RST, 0);
 			i2c_md_write(md, REG_PWM, 0);
+			dsi_status = DSI_PANEL_ERR;
 			return ret;
 		}
 	}
-
 	return ret;
 }
 
@@ -203,7 +228,7 @@ static int panel_unprepare(struct drm_panel *panel)
 		if (ret < 0)
 			return ret;
 	}
-
+	i2c_md_write(md, REG_LCD_RST, 0);
 	return ret;
 }
 
@@ -238,7 +263,6 @@ static int panel_disable(struct drm_panel * panel)
 
 	/* i2c */
 	i2c_md_write(md, REG_PWM, 0);
-	i2c_md_write(md, REG_LCD_RST, 0);
 
 	/* panel */
 	if (funcs && funcs->disable) {
@@ -282,7 +306,9 @@ static int backlight_update(struct backlight_device *bd)
 	int brightness = bd->props.brightness;
 
 	if (bd->props.power != FB_BLANK_UNBLANK ||
+#if (LINUX_VERSION_CODE <= KERNEL_VERSION(6, 12, 0))
 		bd->props.fb_blank != FB_BLANK_UNBLANK ||
+#endif
 		bd->props.state & (BL_CORE_SUSPENDED | BL_CORE_FBBLANK)) {
 			brightness = 0;
 		}
@@ -374,6 +400,7 @@ static int i2c_md_probe(struct i2c_client *i2c, const struct i2c_device_id *id)
 	md->dsi = mipi_dsi_device(dev);
 	if (IS_ERR(md->dsi)) {
 		dev_err(dev, "DSI device registration failed!\n");
+		dsi_status = DSI_FAILURE;
 		return PTR_ERR(md->dsi);
 	}
 
@@ -401,6 +428,8 @@ static int i2c_md_probe(struct i2c_client *i2c, const struct i2c_device_id *id)
 		dev_err(dev, "Can't get the data of tp_point_rotate!\n");
 	}
 
+	ret = sysfs_create_group(&i2c->dev.kobj, &dsi_attr_group);
+
 	DBG_FUNC("Finish");
 	return 0;
 }
@@ -422,10 +451,10 @@ static void i2c_md_remove(struct i2c_client *i2c)
 	i2c_md_write(md, REG_LCD_RST, 0);
 	i2c_md_write(md, REG_PWM, 0);
 
-	mipi_dsi_detach(md->dsi);
+	// mipi_dsi_detach(md->dsi); // TODO: check if this is needed
 	drm_panel_remove(&md->panel);
 	mipi_dsi_device_unregister(md->dsi);
-
+	sysfs_remove_group(&i2c->dev.kobj, &dsi_attr_group);
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6, 1, 0)
 	return 0;
 #endif
@@ -444,16 +473,16 @@ static void i2c_md_shutdown(struct i2c_client *i2c)
 	i2c_md_write(md, REG_LCD_RST, 0);
 	i2c_md_write(md, REG_PWM, 0);
 
-	mipi_dsi_detach(md->dsi);
+	// mipi_dsi_detach(md->dsi); // TODO: check if this is needed
 	drm_panel_remove(&md->panel);
 	mipi_dsi_device_unregister(md->dsi);
 }
 
-extern const struct panel_data ili9881d_data;
+extern const struct panel_data ili9881x_data;
 static const struct of_device_id i2c_md_of_ids[] = {
 	{
-		.compatible = "i2c_dsi,ili9881d",
-		.data = (const void*)&ili9881d_data,
+		.compatible = "i2c_dsi,ili9881x",
+		.data = (const void*)&ili9881x_data,
 	},
 	{ } /* sentinel */
 };
@@ -485,8 +514,10 @@ static int __init i2c_md_init(void)
 
 	DBG_FUNC("Register MIPI-DSI driver");
 	ret = mipi_dsi_driver_register(&mipi_dsi_driver);
-	if (ret < 0)
+	if (ret < 0){
+		dsi_status = DSI_REG_ERR;
 		return ret;
+	}
 
 	return ret;
 }

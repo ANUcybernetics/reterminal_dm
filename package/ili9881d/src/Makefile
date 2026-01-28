@@ -5,9 +5,7 @@
 #
 KVERSION ?= $(shell uname -r)
 
-obj-m = ili9881d.o
-
-ili9881d: all
+obj-m += ili9881d.o
 
 all:
 	$(MAKE) -C /lib/modules/$(KVERSION)/build M=$(PWD) modules
