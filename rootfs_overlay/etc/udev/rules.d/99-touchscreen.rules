@@ -1,0 +1,8 @@
+# Use this file to add touch driver calibrations
+#ATTRS{name}=="gt9271", ENV{LIBINPUT_CALIBRATION_MATRIX}="0  1.0  0 -1.0 0 1.0 0 0 1.0"
+#ATTRS{name}=="gt9271", ENV{LIBINPUT_CALIBRATION_MATRIX}="0  1 0 -1 0 1"
+SUBSYSTEM=="input", KERNEL=="event*", DRIVERS=="Goodix-TS", \
+  ENV{ID_INPUT}="1", \
+  ENV{ID_INPUT_TOUCHSCREEN}="1", \
+  ENV{LIBINPUT_CALIBRATION_MATRIX}="0 -1 1 1 0 0", \
+  MODE="0666", TAG+="uaccess"
