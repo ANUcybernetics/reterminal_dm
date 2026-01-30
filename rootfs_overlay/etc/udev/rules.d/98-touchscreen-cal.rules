@@ -1,3 +1,0 @@
-# Use this file to add touch driver calibrations
-#ATTRS{name}=="gt9271", ENV{LIBINPUT_CALIBRATION_MATRIX}="0  1.0  0 -1.0 0 1.0 0 0 1.0"
-#ATTRS{name}=="gt9271", ENV{LIBINPUT_CALIBRATION_MATRIX}="0  1 0 -1 0 1"
