@@ -87,8 +87,7 @@
 				};
 			};
 			mipi_dsi: mipi_dsi@45 {
-				/* compatible = "gjx,gjx101c7"; */
-        compatible = "feixin,k101-im2byl02";
+				compatible = "gjx,gjx101c7";
 				reg = <0>;
 
 				backlight = <&lcd_backlight>;
