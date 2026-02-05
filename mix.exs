@@ -106,6 +106,7 @@ defmodule NervesSystemRpi4.MixProject do
       "cmdline.txt",
       "config.txt",
       "fwup-ops.conf",
+      "fwup.conf.eex",
       "fwup.conf",
       "LICENSE",
       "linux-6.12.defconfig",
@@ -115,7 +116,7 @@ defmodule NervesSystemRpi4.MixProject do
       "busybox_defconfig",
       "post-build.sh",
       "post-createfs.sh",
-      "ramoops.dts",
+      "ramoops-pi4-overlay.dts",
       "README.md",
       "VERSION"
     ]
