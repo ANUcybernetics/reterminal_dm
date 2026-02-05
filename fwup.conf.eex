@@ -48,8 +48,8 @@ file_resources = [
   %{name: "overlays/reTerminal-brige.dtbo", path: "${NERVES_SYSTEM}/images/rpi-firmware/overlays/reTerminal-bridge.dtbo"},
   %{name: "overlays/reTerminal.dtbo", path: "${NERVES_SYSTEM}/images/rpi-firmware/overlays/reTerminal.dtbo"},
   %{name: "overlays/reTerminal-DM.dtbo", path: "${NERVES_SYSTEM}/images/rpi-firmware/overlays/reTerminal-DM.dtbo"},
-  %{name: "overlays/reTerminal-R100x.dtbo", path: "${NERVES_SYSTEM}/images/rpi-firmware/overlays/reTerminal-R100x.dtbo"},
-  %{name: "overlays/reTerminal-R110x.dtbo", path: "${NERVES_SYSTEM}/images/rpi-firmware/overlays/reTerminal-R110x.dtbo"},
+  %{name: "overlays/reComputer-R100x.dtbo", path: "${NERVES_SYSTEM}/images/rpi-firmware/overlays/reComputer-R100x.dtbo"},
+  %{name: "overlays/reComputer-R110x.dtbo", path: "${NERVES_SYSTEM}/images/rpi-firmware/overlays/reComputer-R110x.dtbo"},
 ]
 %>
 # File resources are listed in the order that they are included in the .fw file
