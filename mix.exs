@@ -19,7 +19,7 @@ defmodule NervesSystemRpi4.MixProject do
       description: description(),
       package: package(),
       deps: deps(),
-      aliases: [loadconfig: [&bootstrap/1]],
+      aliases: [loadconfig: [&bootstrap/1], generate_fwup_conf: &generate_fwup_conf/1],
       docs: docs(),
       preferred_cli_env: %{
         docs: :docs,
@@ -140,5 +140,16 @@ defmodule NervesSystemRpi4.MixProject do
     else
       System.put_env("MIX_TARGET", "target")
     end
+  end
+
+  defp generate_fwup_conf(_args) do
+    template_path = Path.join(__DIR__, "fwup.conf.eex")
+    output_path = Path.join(__DIR__, "fwup.conf")
+
+    Mix.shell().info("Generating fwup.conf")
+
+    content = EEx.eval_file(template_path)
+    File.write!(output_path, content)
+    Mix.shell().info("Successfully generated #{output_path}")
   end
 end
