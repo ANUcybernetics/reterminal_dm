@@ -106,6 +106,8 @@ defmodule NervesSystemRpi4.MixProject do
       "cmdline.txt",
       "config.txt",
       "fwup-ops.conf",
+      "fwup_include/fwup-common.conf",
+      "fwup_include/provisioning.conf",
       "fwup.conf.eex",
       "fwup.conf",
       "LICENSE",
