@@ -114,8 +114,8 @@
             #address-cells = <1>;
             #size-cells = <0>;
             
-            pcf8563@51 {
-                compatible = "nxp,pcf8563";
+            pcf8563w@51 {
+                compatible = "nxp,pcf8563w";
                 reg = <0x51>;
             };
         };
