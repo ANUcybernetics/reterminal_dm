@@ -3,20 +3,21 @@
 # IMPORTANT:
 # Edit `fwup.conf.eex` and run `mix generate_fwup_conf` to generate fwup.conf.
 #
-require-fwup-version="0.15.0"  # For the trim() call
+# Uses RPi4 native tryboot for automatic firmware rollback.
+# See fwup_include/fwup-common.conf for the partition layout.
+#
+require-fwup-version="1.0.0"
 
 define(RETHINGS_DEVICE, "${RETHING}")
 
 include("${NERVES_SDK_IMAGES:-.}/fwup_include/fwup-common.conf")
 <%
-# Define file resources - order matters for firmware update
-file_resources = [
+# Boot resources that go to the active boot partition.
+# start4.elf is handled separately — on complete it goes to AUTOBOOT + BOOT,
+# on upgrade it only goes to the target boot partition.
+boot_resources = [
   %{name: "fixup4.dat", path: "${NERVES_SYSTEM}/images/rpi-firmware/fixup4x.dat"},
-  %{name: "start4.elf", path: "${NERVES_SYSTEM}/images/rpi-firmware/start4x.elf"},
-#  %{name: "config.txt", path: "${NERVES_SYSTEM}/images/config.txt"},
-#  %{name: "cmdline.txt", path: "${NERVES_SYSTEM}/images/cmdline.txt"},
   %{name: "config.txt", path: "${NERVES_APP}/config/nerves/${RETHINGS_DEVICE}/config.txt"},
-  %{name: "cmdline.txt", path: "${NERVES_APP}/config/nerves/${RETHINGS_DEVICE}/cmdline.txt"},
   %{name: "kernel8.img", path: "${NERVES_SYSTEM}/images/Image"},
   %{name: "bcm2711-rpi-4-b.dtb", path: "${NERVES_SYSTEM}/images/bcm2711-rpi-4-b.dtb"},
   %{name: "bcm2711-rpi-cm4.dtb", path: "${NERVES_SYSTEM}/images/bcm2711-rpi-cm4.dtb"},
@@ -43,6 +44,8 @@ file_resources = [
   %{name: "overlays/vc4-kms-v3d.dtbo", path: "${NERVES_SYSTEM}/images/rpi-firmware/overlays/vc4-kms-v3d.dtbo"},
   %{name: "overlays/vc4-kms-v3d-pi4.dtbo", path: "${NERVES_SYSTEM}/images/rpi-firmware/overlays/vc4-kms-v3d-pi4.dtbo"},
   %{name: "overlays/w1-gpio-pullup.dtbo", path: "${NERVES_SYSTEM}/images/rpi-firmware/overlays/w1-gpio-pullup.dtbo"},
+  # TPM
+  %{name: "overlays/tpm-spi-slx9670.dtbo", path: "${NERVES_SYSTEM}/images/rpi-firmware/overlays/tpm-spi-slx9670.dtbo"},
   # Rethings resources
   %{name: "overlays/lis331dlh.dtbo", path: "${NERVES_SYSTEM}/images/rpi-firmware/overlays/lis331dlh.dtbo"},
   %{name: "overlays/reTerminal-brige.dtbo", path: "${NERVES_SYSTEM}/images/rpi-firmware/overlays/reTerminal-bridge.dtbo"},
@@ -51,11 +54,20 @@ file_resources = [
 #  %{name: "overlays/reComputer-R100x.dtbo", path: "${NERVES_SYSTEM}/images/rpi-firmware/overlays/reComputer-R100x.dtbo"},
 #  %{name: "overlays/reComputer-R110x.dtbo", path: "${NERVES_SYSTEM}/images/rpi-firmware/overlays/reComputer-R110x.dtbo"},
 ]
+
+# start4.elf is a special-case resource (written to AUTOBOOT on complete only)
+start4_elf = %{name: "start4.elf", path: "${NERVES_SYSTEM}/images/rpi-firmware/start4x.elf"}
+
+# All resources for file-resource declarations (boot + start4 + cmdline variants)
+all_resources = [start4_elf] ++ boot_resources ++ [
+  %{name: "cmdline-a.txt", path: "${NERVES_APP}/config/nerves/${RETHINGS_DEVICE}/cmdline-a.txt"},
+  %{name: "cmdline-b.txt", path: "${NERVES_APP}/config/nerves/${RETHINGS_DEVICE}/cmdline-b.txt"},
+]
 %>
 # File resources are listed in the order that they are included in the .fw file
 # This is important, since this is the order that they're written on a firmware
 # update due to the event driven nature of the update system.
-<%= for resource <- file_resources do %>file-resource <%= resource.name %> { host-path = "<%= resource.path %>" }
+<%= for resource <- all_resources do %>file-resource <%= resource.name %> { host-path = "<%= resource.path %>" }
 <% end %>
 file-resource rootfs.img {
     host-path = ${ROOTFS}
@@ -64,23 +76,28 @@ file-resource rootfs.img {
     assert-size-lte = ${ROOTFS_A_PART_COUNT}
 }
 
-# This firmware task writes everything to the destination media
+# This firmware task writes everything to the destination media.
+# It is run on a fresh SD card / eMMC.
 task complete {
     # Only match if not mounted
     require-unmounted-destination = true
 
     on-init {
-        mbr_write(mbr-a)
+        mbr_write(mbr)
 
         fat_mkfs(${BOOT_A_PART_OFFSET}, ${BOOT_A_PART_COUNT})
         fat_setlabel(${BOOT_A_PART_OFFSET}, "BOOT-A")
         fat_mkdir(${BOOT_A_PART_OFFSET}, "overlays")
 
+        fat_mkfs(${AUTOBOOT_PART_OFFSET}, ${AUTOBOOT_PART_COUNT})
+        fat_setlabel(${AUTOBOOT_PART_OFFSET}, "AUTOBOOT")
+        # RPi bootloader needs an empty config.txt on the boot-flagged partition
+        fat_touch(${AUTOBOOT_PART_OFFSET}, "config.txt")
+
         uboot_clearenv(uboot-env)
 
         include("${NERVES_PROVISIONING}")
 
-        uboot_setenv(uboot-env, "nerves_fw_active", "a")
         uboot_setenv(uboot-env, "nerves_fw_devpath", ${NERVES_FW_DEVPATH})
         uboot_setenv(uboot-env, "a.nerves_fw_validated", "1")
         uboot_setenv(uboot-env, "a.nerves_fw_application_part0_devpath", ${NERVES_FW_APPLICATION_PART0_DEVPATH})
@@ -97,8 +114,24 @@ task complete {
         uboot_setenv(uboot-env, "a.nerves_fw_uuid", "\${FWUP_META_UUID}")
     }
 
-<%= for resource <- file_resources do %>    on-resource <%= resource.name %> { fat_write(${BOOT_A_PART_OFFSET}, "<%= resource.name %>") }
+    # Write autoboot-a.txt to AUTOBOOT partition (A is the default boot)
+    on-resource autoboot-a.txt { fat_write(${AUTOBOOT_PART_OFFSET}, "autoboot.txt") }
+
+    # Write start4.elf to AUTOBOOT first, then copy to BOOT_A
+    on-resource start4.elf {
+        fat_write(${AUTOBOOT_PART_OFFSET}, "start4.elf")
+        fat_cp(${AUTOBOOT_PART_OFFSET}, "start4.elf", ${BOOT_A_PART_OFFSET}, "start4.elf")
+    }
+
+    # Write boot resources to BOOT_A
+<%= for resource <- boot_resources do %>    on-resource <%= resource.name %> { fat_write(${BOOT_A_PART_OFFSET}, "<%= resource.name %>") }
 <% end %>
+    # Write cmdline-a.txt as cmdline.txt to BOOT_A
+    on-resource cmdline-a.txt { fat_write(${BOOT_A_PART_OFFSET}, "cmdline.txt") }
+
+    # cmdline-b.txt is included in the firmware archive but not written on complete
+    on-resource cmdline-b.txt { }
+
     on-resource rootfs.img {
         # write to the first rootfs partition
         raw_write(${ROOTFS_A_PART_OFFSET})
@@ -119,20 +152,19 @@ task complete {
     }
 }
 
+# Upgrade partition A (currently running on B)
 task upgrade.a {
-    # This task upgrades the A partition
-    require-partition-offset(1, ${ROOTFS_B_PART_OFFSET})
+    require-path-at-offset("/", ${ROOTFS_B_PART_OFFSET})
 
     # Verify the expected platform/architecture
     require-uboot-variable(uboot-env, "b.nerves_fw_platform", "${NERVES_FW_PLATFORM}")
     require-uboot-variable(uboot-env, "b.nerves_fw_architecture", "${NERVES_FW_ARCHITECTURE}")
+    require-uboot-variable(uboot-env, "b.nerves_fw_validated", "1")
 
     on-init {
         info("Upgrading partition A")
 
-        # Clear some firmware information just in case this update gets
-        # interrupted midway. If this partition was bootable, it's not going to
-        # be soon.
+        # Clear firmware information in case this update gets interrupted midway.
         uboot_setenv(uboot-env, "a.nerves_fw_validated", "0")
         uboot_unsetenv(uboot-env, "a.nerves_fw_version")
         uboot_unsetenv(uboot-env, "a.nerves_fw_platform")
@@ -144,15 +176,22 @@ task upgrade.a {
         fat_setlabel(${BOOT_A_PART_OFFSET}, "BOOT-A")
         fat_mkdir(${BOOT_A_PART_OFFSET}, "overlays")
 
-        # Indicate that the entire partition can be cleared
         trim(${ROOTFS_A_PART_OFFSET}, ${ROOTFS_A_PART_COUNT})
     }
 
-    # Write the new boot partition files and rootfs. The MBR still points
-    # to the B partition, so an error or power failure during this part
-    # won't hurt anything.
-<%= for resource <- file_resources do %>    on-resource <%= resource.name %> { fat_write(${BOOT_A_PART_OFFSET}, "<%= resource.name %>") }
+    # Autoboot resources are not written during upgrade — only on validate
+    on-resource autoboot-a.txt { }
+    on-resource autoboot-b.txt { }
+
+    # start4.elf only goes to target boot partition (not AUTOBOOT) during upgrade
+    on-resource start4.elf { fat_write(${BOOT_A_PART_OFFSET}, "start4.elf") }
+
+    # Write boot resources to BOOT_A
+<%= for resource <- boot_resources do %>    on-resource <%= resource.name %> { fat_write(${BOOT_A_PART_OFFSET}, "<%= resource.name %>") }
 <% end %>
+    on-resource cmdline-a.txt { fat_write(${BOOT_A_PART_OFFSET}, "cmdline.txt") }
+    on-resource cmdline-b.txt { }
+
     on-resource rootfs.img {
         delta-source-raw-offset=${ROOTFS_B_PART_OFFSET}
         delta-source-raw-count=${ROOTFS_B_PART_COUNT}
@@ -174,39 +213,34 @@ task upgrade.a {
         uboot_setenv(uboot-env, "a.nerves_fw_misc", ${NERVES_FW_MISC})
         uboot_setenv(uboot-env, "a.nerves_fw_uuid", "\${FWUP_META_UUID}")
 
-        # Switch over to boot the new firmware
-        # NOTE: The mbr_write is the important step. Automatic fallback is not supported, so
-        #       setting the variables is a formality for Nerves.Runtime.firmware_validation_status and
-        #       other code.
-        uboot_setenv(uboot-env, "nerves_fw_active", "a")
-        uboot_setenv(uboot-env, "a.nerves_fw_validated", "1")
-        mbr_write(mbr-a)
+        # Tryboot: reboot into the new partition for validation
+        # The bootloader will use [tryboot] section of autoboot.txt
+        # If validate is never called, next normal reboot goes back to B
+        reboot_param("0 tryboot")
     }
 
     on-error {
     }
 }
 
+# Upgrade partition B (currently running on A)
 task upgrade.b {
-    # This task upgrades the B partition
-    require-partition-offset(1, ${ROOTFS_A_PART_OFFSET})
+    require-path-at-offset("/", ${ROOTFS_A_PART_OFFSET})
 
     # Verify the expected platform/architecture
     require-uboot-variable(uboot-env, "a.nerves_fw_platform", "${NERVES_FW_PLATFORM}")
     require-uboot-variable(uboot-env, "a.nerves_fw_architecture", "${NERVES_FW_ARCHITECTURE}")
+    require-uboot-variable(uboot-env, "a.nerves_fw_validated", "1")
 
     on-init {
         info("Upgrading partition B")
 
-        # Clear some firmware information just in case this update gets
-        # interrupted midway.
         uboot_setenv(uboot-env, "b.nerves_fw_validated", "0")
         uboot_unsetenv(uboot-env, "b.nerves_fw_version")
         uboot_unsetenv(uboot-env, "b.nerves_fw_platform")
         uboot_unsetenv(uboot-env, "b.nerves_fw_architecture")
         uboot_unsetenv(uboot-env, "b.nerves_fw_uuid")
 
-        # Reset the previous contents of the B boot partition
         fat_mkfs(${BOOT_B_PART_OFFSET}, ${BOOT_B_PART_COUNT})
         fat_setlabel(${BOOT_B_PART_OFFSET}, "BOOT-B")
         fat_mkdir(${BOOT_B_PART_OFFSET}, "overlays")
@@ -214,11 +248,18 @@ task upgrade.b {
         trim(${ROOTFS_B_PART_OFFSET}, ${ROOTFS_B_PART_COUNT})
     }
 
-    # Write the new boot partition files and rootfs. The MBR still points
-    # to the A partition, so an error or power failure during this part
-    # won't hurt anything.
-<%= for resource <- file_resources do %>    on-resource <%= resource.name %> { fat_write(${BOOT_B_PART_OFFSET}, "<%= resource.name %>") }
+    on-resource autoboot-a.txt { }
+    on-resource autoboot-b.txt { }
+
+    # start4.elf only goes to target boot partition (not AUTOBOOT) during upgrade
+    on-resource start4.elf { fat_write(${BOOT_B_PART_OFFSET}, "start4.elf") }
+
+    # Write boot resources to BOOT_B
+<%= for resource <- boot_resources do %>    on-resource <%= resource.name %> { fat_write(${BOOT_B_PART_OFFSET}, "<%= resource.name %>") }
 <% end %>
+    on-resource cmdline-a.txt { }
+    on-resource cmdline-b.txt { fat_write(${BOOT_B_PART_OFFSET}, "cmdline.txt") }
+
     on-resource rootfs.img {
         delta-source-raw-offset=${ROOTFS_A_PART_OFFSET}
         delta-source-raw-count=${ROOTFS_A_PART_COUNT}
@@ -226,7 +267,6 @@ task upgrade.b {
     }
 
     on-finish {
-        # Update firmware metadata
         uboot_setenv(uboot-env, "b.nerves_fw_application_part0_devpath", ${NERVES_FW_APPLICATION_PART0_DEVPATH})
         uboot_setenv(uboot-env, "b.nerves_fw_application_part0_fstype", ${NERVES_FW_APPLICATION_PART0_FSTYPE})
         uboot_setenv(uboot-env, "b.nerves_fw_application_part0_target", ${NERVES_FW_APPLICATION_PART0_TARGET})
@@ -240,13 +280,168 @@ task upgrade.b {
         uboot_setenv(uboot-env, "b.nerves_fw_misc", ${NERVES_FW_MISC})
         uboot_setenv(uboot-env, "b.nerves_fw_uuid", "\${FWUP_META_UUID}")
 
-        # Switch over to boot the new firmware
-        # NOTE: The mbr_write is the important step. Automatic fallback is not supported, so
-        #       setting the variables is a formality for Nerves.Runtime.firmware_validation_status and
-        #       other code.
-        uboot_setenv(uboot-env, "nerves_fw_active", "b")
+        reboot_param("0 tryboot")
+    }
+
+    on-error {
+    }
+}
+
+# OTA migration from v1.x (MBR-swap) layout.
+# This task upgrades A when currently running on B (old layout).
+task upgrade.old-a {
+    # Detect old layout: MBR partition 1 points to old ROOTFS_B offset
+    require-partition-offset(1, ${OLD_ROOTFS_B_PART_OFFSET})
+
+    require-uboot-variable(uboot-env, "b.nerves_fw_platform", "${NERVES_FW_PLATFORM}")
+    require-uboot-variable(uboot-env, "b.nerves_fw_architecture", "${NERVES_FW_ARCHITECTURE}")
+
+    on-init {
+        info("Migrating from v1.x layout to tryboot (writing to A)")
+
+        uboot_setenv(uboot-env, "a.nerves_fw_validated", "0")
+        uboot_unsetenv(uboot-env, "a.nerves_fw_version")
+        uboot_unsetenv(uboot-env, "a.nerves_fw_platform")
+        uboot_unsetenv(uboot-env, "a.nerves_fw_architecture")
+        uboot_unsetenv(uboot-env, "a.nerves_fw_uuid")
+
+        # Create AUTOBOOT partition (in space between BOOT_B and old ROOTFS_A)
+        fat_mkfs(${AUTOBOOT_PART_OFFSET}, ${AUTOBOOT_PART_COUNT})
+        fat_setlabel(${AUTOBOOT_PART_OFFSET}, "AUTOBOOT")
+        fat_touch(${AUTOBOOT_PART_OFFSET}, "config.txt")
+
+        # Create new BOOT_A partition
+        fat_mkfs(${BOOT_A_PART_OFFSET}, ${BOOT_A_PART_COUNT})
+        fat_setlabel(${BOOT_A_PART_OFFSET}, "BOOT-A")
+        fat_mkdir(${BOOT_A_PART_OFFSET}, "overlays")
+
+        trim(${ROOTFS_A_PART_OFFSET}, ${ROOTFS_A_PART_COUNT})
+    }
+
+    # Write autoboot-a.txt to commit to A directly (no tryboot for migration)
+    on-resource autoboot-a.txt { fat_write(${AUTOBOOT_PART_OFFSET}, "autoboot.txt") }
+    on-resource autoboot-b.txt { }
+
+    # start4.elf goes to AUTOBOOT + BOOT_A on migration (like complete)
+    on-resource start4.elf {
+        fat_write(${AUTOBOOT_PART_OFFSET}, "start4.elf")
+        fat_cp(${AUTOBOOT_PART_OFFSET}, "start4.elf", ${BOOT_A_PART_OFFSET}, "start4.elf")
+    }
+
+<%= for resource <- boot_resources do %>    on-resource <%= resource.name %> { fat_write(${BOOT_A_PART_OFFSET}, "<%= resource.name %>") }
+<% end %>
+    on-resource cmdline-a.txt { fat_write(${BOOT_A_PART_OFFSET}, "cmdline.txt") }
+    on-resource cmdline-b.txt { }
+
+    on-resource rootfs.img {
+        delta-source-raw-offset=${OLD_ROOTFS_B_PART_OFFSET}
+        delta-source-raw-count=${OLD_ROOTFS_B_PART_COUNT}
+        raw_write(${ROOTFS_A_PART_OFFSET})
+    }
+
+    on-finish {
+        # Write new MBR LAST — if interrupted before this, old layout is still intact
+        mbr_write(mbr)
+
+        uboot_setenv(uboot-env, "a.nerves_fw_validated", "1")
+        uboot_setenv(uboot-env, "b.nerves_fw_validated", "0")
+        uboot_setenv(uboot-env, "a.nerves_fw_application_part0_devpath", ${NERVES_FW_APPLICATION_PART0_DEVPATH})
+        uboot_setenv(uboot-env, "a.nerves_fw_application_part0_fstype", ${NERVES_FW_APPLICATION_PART0_FSTYPE})
+        uboot_setenv(uboot-env, "a.nerves_fw_application_part0_target", ${NERVES_FW_APPLICATION_PART0_TARGET})
+        uboot_setenv(uboot-env, "a.nerves_fw_product", ${NERVES_FW_PRODUCT})
+        uboot_setenv(uboot-env, "a.nerves_fw_description", ${NERVES_FW_DESCRIPTION})
+        uboot_setenv(uboot-env, "a.nerves_fw_version", ${NERVES_FW_VERSION})
+        uboot_setenv(uboot-env, "a.nerves_fw_platform", ${NERVES_FW_PLATFORM})
+        uboot_setenv(uboot-env, "a.nerves_fw_architecture", ${NERVES_FW_ARCHITECTURE})
+        uboot_setenv(uboot-env, "a.nerves_fw_author", ${NERVES_FW_AUTHOR})
+        uboot_setenv(uboot-env, "a.nerves_fw_vcs_identifier", ${NERVES_FW_VCS_IDENTIFIER})
+        uboot_setenv(uboot-env, "a.nerves_fw_misc", ${NERVES_FW_MISC})
+        uboot_setenv(uboot-env, "a.nerves_fw_uuid", "\${FWUP_META_UUID}")
+
+        # Clean up legacy variables
+        uboot_unsetenv(uboot-env, "nerves_fw_active")
+        uboot_unsetenv(uboot-env, "nerves_fw_validated")
+    }
+
+    on-error {
+    }
+}
+
+# OTA migration from v1.x (MBR-swap) layout.
+# This task upgrades B when currently running on A (old layout).
+task upgrade.old-b {
+    # Detect old layout: MBR partition 1 points to old ROOTFS_A offset
+    require-partition-offset(1, ${OLD_ROOTFS_A_PART_OFFSET})
+
+    require-uboot-variable(uboot-env, "a.nerves_fw_platform", "${NERVES_FW_PLATFORM}")
+    require-uboot-variable(uboot-env, "a.nerves_fw_architecture", "${NERVES_FW_ARCHITECTURE}")
+
+    on-init {
+        info("Migrating from v1.x layout to tryboot (writing to B)")
+
+        uboot_setenv(uboot-env, "b.nerves_fw_validated", "0")
+        uboot_unsetenv(uboot-env, "b.nerves_fw_version")
+        uboot_unsetenv(uboot-env, "b.nerves_fw_platform")
+        uboot_unsetenv(uboot-env, "b.nerves_fw_architecture")
+        uboot_unsetenv(uboot-env, "b.nerves_fw_uuid")
+
+        # Create AUTOBOOT partition (in space between BOOT_B and old ROOTFS_A)
+        fat_mkfs(${AUTOBOOT_PART_OFFSET}, ${AUTOBOOT_PART_COUNT})
+        fat_setlabel(${AUTOBOOT_PART_OFFSET}, "AUTOBOOT")
+        fat_touch(${AUTOBOOT_PART_OFFSET}, "config.txt")
+
+        # Create new BOOT_B partition
+        fat_mkfs(${BOOT_B_PART_OFFSET}, ${BOOT_B_PART_COUNT})
+        fat_setlabel(${BOOT_B_PART_OFFSET}, "BOOT-B")
+        fat_mkdir(${BOOT_B_PART_OFFSET}, "overlays")
+
+        trim(${ROOTFS_B_PART_OFFSET}, ${ROOTFS_B_PART_COUNT})
+    }
+
+    # Write autoboot-b.txt to commit to B directly (no tryboot for migration)
+    on-resource autoboot-a.txt { }
+    on-resource autoboot-b.txt { fat_write(${AUTOBOOT_PART_OFFSET}, "autoboot.txt") }
+
+    # start4.elf goes to AUTOBOOT + BOOT_B on migration (like complete)
+    on-resource start4.elf {
+        fat_write(${AUTOBOOT_PART_OFFSET}, "start4.elf")
+        fat_cp(${AUTOBOOT_PART_OFFSET}, "start4.elf", ${BOOT_B_PART_OFFSET}, "start4.elf")
+    }
+
+<%= for resource <- boot_resources do %>    on-resource <%= resource.name %> { fat_write(${BOOT_B_PART_OFFSET}, "<%= resource.name %>") }
+<% end %>
+    on-resource cmdline-a.txt { }
+    on-resource cmdline-b.txt { fat_write(${BOOT_B_PART_OFFSET}, "cmdline.txt") }
+
+    on-resource rootfs.img {
+        delta-source-raw-offset=${OLD_ROOTFS_A_PART_OFFSET}
+        delta-source-raw-count=${OLD_ROOTFS_A_PART_COUNT}
+        raw_write(${ROOTFS_B_PART_OFFSET})
+    }
+
+    on-finish {
+        # Write new MBR LAST — if interrupted before this, old layout is still intact
+        mbr_write(mbr)
+
         uboot_setenv(uboot-env, "b.nerves_fw_validated", "1")
-        mbr_write(mbr-b)
+        uboot_setenv(uboot-env, "a.nerves_fw_validated", "0")
+        uboot_setenv(uboot-env, "b.nerves_fw_application_part0_devpath", ${NERVES_FW_APPLICATION_PART0_DEVPATH})
+        uboot_setenv(uboot-env, "b.nerves_fw_application_part0_fstype", ${NERVES_FW_APPLICATION_PART0_FSTYPE})
+        uboot_setenv(uboot-env, "b.nerves_fw_application_part0_target", ${NERVES_FW_APPLICATION_PART0_TARGET})
+        uboot_setenv(uboot-env, "b.nerves_fw_product", ${NERVES_FW_PRODUCT})
+        uboot_setenv(uboot-env, "b.nerves_fw_description", ${NERVES_FW_DESCRIPTION})
+        uboot_setenv(uboot-env, "b.nerves_fw_version", ${NERVES_FW_VERSION})
+        uboot_setenv(uboot-env, "b.nerves_fw_platform", ${NERVES_FW_PLATFORM})
+        uboot_setenv(uboot-env, "b.nerves_fw_architecture", ${NERVES_FW_ARCHITECTURE})
+        uboot_setenv(uboot-env, "b.nerves_fw_author", ${NERVES_FW_AUTHOR})
+        uboot_setenv(uboot-env, "b.nerves_fw_vcs_identifier", ${NERVES_FW_VCS_IDENTIFIER})
+        uboot_setenv(uboot-env, "b.nerves_fw_misc", ${NERVES_FW_MISC})
+        uboot_setenv(uboot-env, "b.nerves_fw_uuid", "\${FWUP_META_UUID}")
+
+        # Clean up legacy variables
+        uboot_unsetenv(uboot-env, "nerves_fw_active")
+        uboot_unsetenv(uboot-env, "nerves_fw_validated")
+        # Direct commit — no tryboot for migration (too risky)
     }
 
     on-error {
