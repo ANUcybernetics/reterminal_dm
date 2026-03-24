@@ -330,12 +330,16 @@ static int backlight_init(struct i2c_mipi_dsi *md)
 	struct device *dev = &md->i2c->dev;
 	struct backlight_properties props;
 	struct backlight_device *bd;
+	const char *bl_name;
 
 	DBG_FUNC("Register backlight device");
+	if (device_property_read_string(dev, "label", &bl_name))
+		bl_name = dev_name(dev);
+
 	memset(&props, 0, sizeof(props));
 	props.type = BACKLIGHT_RAW;
 	props.max_brightness = 255;
-	bd = devm_backlight_device_register(dev, dev_name(dev),
+	bd = devm_backlight_device_register(dev, bl_name,
 					dev, md, &backlight_ops,
 					&props);
 	if (IS_ERR(bd)) {

@@ -186,8 +186,9 @@
 			__overlay__ {
 					lcd_backlight: lcd_backlight {
 							compatible = "pwm-backlight";
-							brightness-levels = <96 128 160 192 224 255>;
-							default-brightness-level = <4>;
+							brightness-levels = <0 255>;
+							num-interpolated-steps = <255>;
+							default-brightness-level = <224>;
 							pwms = <&pwm 1 200000 0>;
 							power-supply = <&vdd_3v3_reg>;
 							status = "okay";

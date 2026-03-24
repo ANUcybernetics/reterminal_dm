@@ -24,3 +24,4 @@ erl_crash.dump
 *.tar.gz
 
 .DS_Store
+.claude/

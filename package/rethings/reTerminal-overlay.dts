@@ -92,7 +92,8 @@
             mipi_dsi: mipi_dsi@45 {
                 compatible = "i2c_dsi,ili9881d";
                 reg = <0x45>;
-                
+                label = "lcd_backlight";
+
                 mcu_auto_reset_enable = <0>;
                 tp_point_rotate = <0>;
 
