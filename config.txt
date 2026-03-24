@@ -26,6 +26,8 @@ fixup_file=fixup4.dat
 
 gpu_mem=512
 
+dtoverlay=tpm-spi-slx9670
+
 # Optional Overclocking: Max for cm4
 # https://www.jeffgeerling.com/blog/2020/overclocking-raspberry-pi-compute-module-4
 
