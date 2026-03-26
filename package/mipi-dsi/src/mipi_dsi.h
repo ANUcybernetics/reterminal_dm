@@ -127,6 +127,7 @@ struct i2c_mipi_dsi {
 	struct input_dev *input;
 	struct touchscreen_properties prop;
 	uint32_t tp_point_rotate;
+	bool panel_ready;
 
 	// backlight
 	int brightness;

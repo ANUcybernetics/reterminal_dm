@@ -215,6 +215,10 @@ static int panel_prepare(struct drm_panel *panel)
 			return ret;
 		}
 	}
+
+	/* Panel is ready — allow touch polling to start */
+	md->panel_ready = true;
+
 	return ret;
 }
 
