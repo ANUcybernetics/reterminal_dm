@@ -228,7 +228,9 @@ static int panel_unprepare(struct drm_panel *panel)
 		if (ret < 0)
 			return ret;
 	}
-	i2c_md_write(md, REG_LCD_RST, 0);
+	/* Skip LCD reset during shutdown to preserve DSI state for warm reboot */
+	if (!md->shutting_down)
+		i2c_md_write(md, REG_LCD_RST, 0);
 	return ret;
 }
 
@@ -470,13 +472,12 @@ static void i2c_md_shutdown(struct i2c_client *i2c)
 
 	DBG_PRINT("Shutdown I2C driver");
 
-	tp_deinit(md);
-
-	/* Do NOT power off or reset LCD on shutdown.
+	/* Set flag before DRM teardown so panel_unprepare() skips LCD reset.
 	 * Preserves DSI state across warm reboot so the GPU firmware
-	 * can reinitialize the display on the next boot.
-	 * Powering off here kills the display after warm reboot
-	 * because the GPU firmware finds dead hardware. */
+	 * can reinitialize the display on the next boot. */
+	md->shutting_down = true;
+
+	tp_deinit(md);
 
 	drm_panel_remove(&md->panel);
 	mipi_dsi_device_unregister(md->dsi);
