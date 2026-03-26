@@ -488,7 +488,7 @@ static void i2c_md_shutdown(struct i2c_client *i2c)
 extern const struct panel_data ili9881x_data;
 static const struct of_device_id i2c_md_of_ids[] = {
 	{
-		.compatible = "i2c_dsi,ili9881x",
+		.compatible = "i2c_dsi,ili9881d",
 		.data = (const void*)&ili9881x_data,
 	},
 	{ } /* sentinel */
