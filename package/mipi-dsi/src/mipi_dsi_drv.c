@@ -216,9 +216,6 @@ static int panel_prepare(struct drm_panel *panel)
 		}
 	}
 
-	/* Panel is ready — allow touch polling to start */
-	md->panel_ready = true;
-
 	return ret;
 }
 
@@ -235,7 +232,6 @@ static int panel_unprepare(struct drm_panel *panel)
 		if (ret < 0)
 			return ret;
 	}
-	i2c_md_write(md, REG_LCD_RST, 0);
 	return ret;
 }
 
@@ -256,12 +252,6 @@ static int panel_enable(struct drm_panel * panel)
 
 	/* i2c */
 	i2c_md_write(md, REG_PWM, md->brightness);
-
-	/* Allow touch polling — covers both prepare and enable paths */
-	if (!md->panel_ready) {
-		md->panel_ready = true;
-		DBG_PRINT("Touch polling enabled");
-	}
 
 	return ret;
 }

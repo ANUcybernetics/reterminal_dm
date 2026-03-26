@@ -759,8 +759,7 @@ static int ili9881x_prepare(struct drm_panel *panel)
 // Called to turn off the panel
 static int ili9881x_unprepare(struct drm_panel *panel)
 {
-	if (ili9881x_dsi)
-		mipi_dsi_dcs_enter_sleep_mode(ili9881x_dsi);
+	/* Do NOT send sleep mode — it kills STM32 touch during deferred probe retries */
 	return 0;
 }
 

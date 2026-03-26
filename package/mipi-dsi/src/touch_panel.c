@@ -114,10 +114,6 @@ static void tp_poll_func(struct input_dev *input)
 	int touch_num;
 	int i;
 
-	/* Don't poll STM32 for touch until panel is ready */
-	if (!md->panel_ready)
-		return;
-
 	touch_num = goodix_ts_read_input_report(md, point_data);
 	if (touch_num < 0) {
 		return;
