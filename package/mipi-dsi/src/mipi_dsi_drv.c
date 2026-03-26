@@ -199,6 +199,10 @@ static int panel_prepare(struct drm_panel *panel)
 	i2c_md_write(md, REG_LCD_RST, 0);
 	msleep(20);
 	i2c_md_write(md, REG_LCD_RST, 1);
+	msleep(20);
+	i2c_md_write(md, REG_TP_RST, 0);
+	msleep(20);
+	i2c_md_write(md, REG_TP_RST, 1);
 	msleep(50);
 
 	/* panel */
@@ -416,12 +420,6 @@ static int i2c_md_probe(struct i2c_client *i2c, const struct i2c_device_id *id)
 #endif
 	drm_panel_init(&md->panel, dev, &panel_funcs, DRM_MODE_CONNECTOR_DSI);
 	drm_panel_add(&md->panel);
-
-	/* Reset touch controller in STM32 before init */
-	i2c_md_write(md, REG_TP_RST, 0);
-	msleep(20);
-	i2c_md_write(md, REG_TP_RST, 1);
-	msleep(50);
 
 	tp_init(md);
 	backlight_init(md);
