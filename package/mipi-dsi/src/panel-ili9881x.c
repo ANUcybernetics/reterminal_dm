@@ -751,23 +751,23 @@ static int ili9881x_prepare(struct drm_panel *panel)
 	// Detect panel type by reading ID
 	ret = ili9881_read_id(dsi);
 	if (ret < 0) {
-		pr_err("Failed to read ILI9881 ID\n");
-		return ret;
+		pr_warn("ILI9881 ID read failed (%d), using D03 fallback init\n", ret);
+		panel_type = ILI9881D03;
 	}
 
 	switch (panel_type) {
 	case ILI9881D02:
 		ili9881d02_init(dsi);
 		break;
-	case ILI9881D03:
-		ili9881d03_init(dsi);
-		break;
 	case ILI9881C05:
 		ili9881c05_init(dsi);
 		break;
+	case ILI9881D03:
 	default:
-		pr_warn("Unknown ILI9881 panel type\n");
-		return -ENODEV;
+		if (panel_type != ILI9881D03)
+			pr_warn("Unknown ILI9881 panel type %d, using D03 fallback\n", panel_type);
+		ili9881d03_init(dsi);
+		break;
 	}
 
 	return 0;

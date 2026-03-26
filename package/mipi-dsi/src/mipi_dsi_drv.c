@@ -105,7 +105,7 @@ static int mipi_dsi_probe(struct mipi_dsi_device *dsi)
 
 	DBG_PRINT("Probe MIPI-DSI driver");
 
-	dsi->mode_flags = MIPI_DSI_MODE_VIDEO | MIPI_DSI_MODE_LPM;
+	dsi->mode_flags = MIPI_DSI_MODE_VIDEO;
 	dsi->format = MIPI_DSI_FMT_RGB888;
 	dsi->lanes = 4;
 
@@ -205,9 +205,8 @@ static int panel_prepare(struct drm_panel *panel)
 	if (funcs && funcs->prepare) {
 		ret = funcs->prepare(panel);
 		if (ret < 0){
-			i2c_md_write(md, REG_POWERON, 0);
-			i2c_md_write(md, REG_LCD_RST, 0);
-			i2c_md_write(md, REG_PWM, 0);
+			/* Log error but keep STM32 powered on for touch */
+			dev_warn(panel->dev, "Panel prepare failed: %d\n", ret);
 			dsi_status = DSI_PANEL_ERR;
 			return ret;
 		}
@@ -417,6 +416,12 @@ static int i2c_md_probe(struct i2c_client *i2c, const struct i2c_device_id *id)
 #endif
 	drm_panel_init(&md->panel, dev, &panel_funcs, DRM_MODE_CONNECTOR_DSI);
 	drm_panel_add(&md->panel);
+
+	/* Reset touch controller in STM32 before init */
+	i2c_md_write(md, REG_TP_RST, 0);
+	msleep(20);
+	i2c_md_write(md, REG_TP_RST, 1);
+	msleep(50);
 
 	tp_init(md);
 	backlight_init(md);
