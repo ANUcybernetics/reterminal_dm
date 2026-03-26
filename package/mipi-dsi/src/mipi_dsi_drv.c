@@ -190,18 +190,24 @@ static int panel_prepare(struct drm_panel *panel)
 	struct i2c_mipi_dsi *md = panel_to_md(panel);
 	const struct drm_panel_funcs *funcs = md->panel_data->funcs;
 
-	DBG_PRINT("Prepare panel (no LCD reset — preserve STM32 touch)");
+	DBG_PRINT("Prepare panel");
 
-	/* Do NOT reset LCD_RST here. The GPU firmware already initialized
-	 * the STM32 MCU and its touch controller. Toggling LCD_RST kills
-	 * the touch controller and it cannot recover without power cycle.
-	 * Just ensure power is on. */
+	/* i2c */
+	/* reset pin */
 	i2c_md_write(md, REG_POWERON, 1);
+	msleep(20);
+	i2c_md_write(md, REG_LCD_RST, 0);
+	msleep(20);
+	i2c_md_write(md, REG_LCD_RST, 1);
+	msleep(50);
 
 	/* panel */
 	if (funcs && funcs->prepare) {
 		ret = funcs->prepare(panel);
 		if (ret < 0){
+			i2c_md_write(md, REG_POWERON, 0);
+			i2c_md_write(md, REG_LCD_RST, 0);
+			i2c_md_write(md, REG_PWM, 0);
 			dsi_status = DSI_PANEL_ERR;
 			return ret;
 		}
@@ -211,12 +217,19 @@ static int panel_prepare(struct drm_panel *panel)
 
 static int panel_unprepare(struct drm_panel *panel)
 {
-	/* Don't reset LCD or send sleep commands during unprepare.
-	 * The DRM framework calls this during deferred probe retries
-	 * and mode changes. Resetting LCD_RST kills the STM32 touch
-	 * controller which cannot recover without a full power cycle. */
-	DBG_PRINT("Unprepare panel (no-op to preserve touch)");
-	return 0;
+	int ret = 0;
+	struct i2c_mipi_dsi *md = panel_to_md(panel);
+	const struct drm_panel_funcs *funcs = md->panel_data->funcs;
+
+	DBG_PRINT("Unprepare panel");
+
+	if (funcs && funcs->unprepare) {
+		ret = funcs->unprepare(panel);
+		if (ret < 0)
+			return ret;
+	}
+	i2c_md_write(md, REG_LCD_RST, 0);
+	return ret;
 }
 
 static int panel_enable(struct drm_panel * panel)
