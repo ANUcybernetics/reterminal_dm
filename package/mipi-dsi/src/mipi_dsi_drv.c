@@ -199,23 +199,19 @@ static int panel_prepare(struct drm_panel *panel)
 	i2c_md_write(md, REG_LCD_RST, 0);
 	msleep(20);
 	i2c_md_write(md, REG_LCD_RST, 1);
-	msleep(20);
-	i2c_md_write(md, REG_TP_RST, 0);
-	msleep(20);
-	i2c_md_write(md, REG_TP_RST, 1);
 	msleep(50);
 
 	/* panel */
 	if (funcs && funcs->prepare) {
 		ret = funcs->prepare(panel);
 		if (ret < 0){
-			/* Log error but keep STM32 powered on for touch */
-			dev_warn(panel->dev, "Panel prepare failed: %d\n", ret);
+			i2c_md_write(md, REG_POWERON, 0);
+			i2c_md_write(md, REG_LCD_RST, 0);
+			i2c_md_write(md, REG_PWM, 0);
 			dsi_status = DSI_PANEL_ERR;
 			return ret;
 		}
 	}
-
 	return ret;
 }
 
@@ -232,6 +228,7 @@ static int panel_unprepare(struct drm_panel *panel)
 		if (ret < 0)
 			return ret;
 	}
+	i2c_md_write(md, REG_LCD_RST, 0);
 	return ret;
 }
 
@@ -488,7 +485,7 @@ static void i2c_md_shutdown(struct i2c_client *i2c)
 extern const struct panel_data ili9881x_data;
 static const struct of_device_id i2c_md_of_ids[] = {
 	{
-		.compatible = "i2c_dsi,ili9881d",
+		.compatible = "i2c_dsi,ili9881x",
 		.data = (const void*)&ili9881x_data,
 	},
 	{ } /* sentinel */
