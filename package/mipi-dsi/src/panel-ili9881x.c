@@ -776,14 +776,12 @@ static int ili9881x_get_modes(struct drm_panel *panel, struct drm_connector *con
 	connector->display_info.width_mm = mode->width_mm;
 	connector->display_info.height_mm = mode->height_mm;
 	drm_mode_probed_add(connector, mode);
-	drm_connector_set_panel_orientation(connector, DRM_MODE_PANEL_ORIENTATION_RIGHT_UP);
 	return 1;
 }
 
 static const struct drm_panel_funcs ili9881x_funcs = {
 	.get_modes = ili9881x_get_modes,
 	.prepare = ili9881x_prepare,
-	.unprepare = ili9881x_unprepare,
 };
 
 static void ili9881x_set_dsi(struct mipi_dsi_device *dsi)
