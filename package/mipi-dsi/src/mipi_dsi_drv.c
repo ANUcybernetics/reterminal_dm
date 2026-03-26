@@ -189,34 +189,19 @@ static int panel_prepare(struct drm_panel *panel)
 	int ret = 0;
 	struct i2c_mipi_dsi *md = panel_to_md(panel);
 	const struct drm_panel_funcs *funcs = md->panel_data->funcs;
-	u8 id = 0;
 
-	DBG_PRINT("Prepare panel");
+	DBG_PRINT("Prepare panel (no LCD reset — preserve STM32 touch)");
 
-	/* Check if STM32 MCU is already running (GPU firmware initialized it).
-	 * If so, skip the LCD reset to preserve touch controller state. */
-	i2c_md_read(md, REG_ID, &id, 1);
-	if (id == 0xC3) {
-		DBG_PRINT("STM32 already initialized (id=0xC3), skipping LCD reset");
-		goto panel_init;
-	}
-
-	/* Cold start: full reset sequence */
+	/* Do NOT reset LCD_RST here. The GPU firmware already initialized
+	 * the STM32 MCU and its touch controller. Toggling LCD_RST kills
+	 * the touch controller and it cannot recover without power cycle.
+	 * Just ensure power is on. */
 	i2c_md_write(md, REG_POWERON, 1);
-	msleep(20);
-	i2c_md_write(md, REG_LCD_RST, 0);
-	msleep(20);
-	i2c_md_write(md, REG_LCD_RST, 1);
-	msleep(50);
 
-panel_init:
 	/* panel */
 	if (funcs && funcs->prepare) {
 		ret = funcs->prepare(panel);
 		if (ret < 0){
-			i2c_md_write(md, REG_POWERON, 0);
-			i2c_md_write(md, REG_LCD_RST, 0);
-			i2c_md_write(md, REG_PWM, 0);
 			dsi_status = DSI_PANEL_ERR;
 			return ret;
 		}
