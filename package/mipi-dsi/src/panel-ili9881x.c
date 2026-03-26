@@ -59,11 +59,10 @@ static int ili9881d_prepare(struct drm_panel *panel)
 	if (!dsi)
 		return -1;
 
-	ret = mipi_dsi_generic_read(dsi, &addr, sizeof(addr), &val, sizeof(val));
-	if (ret < 0) {
-		DBG_FUNC("No LCD connected, pls check your hardware!");
-		return -ENODEV;
-	}
+	/* Never send DSI init commands — GPU handles display init via
+	 * display_auto_detect=1. Sending DSI commands kills STM32 touch.
+	 * Return -ENODEV so DRM skips panel init (display works via GPU). */
+	return -ENODEV;
 
 	ILI9881_PAGE(0x01);
 	IILI9881_COMMAND(0x91,0x00);
