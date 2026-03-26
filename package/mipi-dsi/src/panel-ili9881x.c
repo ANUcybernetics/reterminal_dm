@@ -745,12 +745,23 @@ static int ili9881x_prepare(struct drm_panel *panel)
 {
 	struct mipi_dsi_device *dsi = ili9881x_dsi;
 	int ret;
+	u16 addr = 0xda;
+	u32 val[4] = {0};
 
 	if (!dsi) return -ENODEV;
 
-	/* Skip ID detection — DSI reads may confuse STM32 touch controller.
-	 * Go straight to D03 init (most common reTerminal panel variant). */
-	pr_info("Initializing panel with D03 sequence (no ID read)\n");
+	/* Check if panel is reachable via DSI. If the GPU bootloader already
+	 * initialized the display (display_auto_detect=1), this read may fail
+	 * because the kernel DSI link isn't fully established. In that case,
+	 * return -ENODEV to skip re-initialization — the display works via
+	 * GPU init, and sending DSI commands would confuse the STM32 touch. */
+	ret = mipi_dsi_generic_read(dsi, &addr, sizeof(addr), &val, sizeof(val));
+	if (ret < 0) {
+		pr_info("DSI read check failed (%d), panel already initialized by GPU\n", ret);
+		return -ENODEV;
+	}
+
+	pr_info("Initializing panel with D03 sequence\n");
 	ili9881d03_init(dsi);
 
 	return 0;
