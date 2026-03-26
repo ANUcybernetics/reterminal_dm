@@ -472,12 +472,12 @@ static void i2c_md_shutdown(struct i2c_client *i2c)
 
 	tp_deinit(md);
 
-	/* Turn off power */
-	i2c_md_write(md, REG_POWERON, 0);
-	i2c_md_write(md, REG_LCD_RST, 0);
-	i2c_md_write(md, REG_PWM, 0);
+	/* Do NOT power off or reset LCD on shutdown.
+	 * Preserves DSI state across warm reboot so the GPU firmware
+	 * can reinitialize the display on the next boot.
+	 * Powering off here kills the display after warm reboot
+	 * because the GPU firmware finds dead hardware. */
 
-	// mipi_dsi_detach(md->dsi); // TODO: check if this is needed
 	drm_panel_remove(&md->panel);
 	mipi_dsi_device_unregister(md->dsi);
 }
