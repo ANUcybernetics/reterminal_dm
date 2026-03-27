@@ -131,9 +131,6 @@ struct i2c_mipi_dsi {
 	// backlight
 	int brightness;
 
-	// set during shutdown to prevent panel_unprepare from resetting LCD
-	bool shutting_down;
-
 	// mcu auto reset enable when the tp driver is not working
 	uint32_t mcu_auto_reset;
 };

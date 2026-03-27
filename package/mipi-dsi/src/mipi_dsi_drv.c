@@ -10,6 +10,7 @@
  */
 #include "mipi_dsi.h"
 #include <linux/version.h>
+#include <linux/reboot.h>
 
 static int dsi_status = DSI_OK; //0:dsi is ok, not 0:something wrong with dsi
 static ssize_t dsi_state_show(struct device *dev,
@@ -228,8 +229,10 @@ static int panel_unprepare(struct drm_panel *panel)
 		if (ret < 0)
 			return ret;
 	}
-	/* Skip LCD reset during shutdown to preserve DSI state for warm reboot */
-	if (!md->shutting_down)
+	/* Skip LCD reset during shutdown/reboot to preserve DSI state.
+	 * The STM32 stays powered on warm reboot; if we assert LCD_RST here,
+	 * the GPU firmware finds a dead panel on the next boot. */
+	if (system_state == SYSTEM_RUNNING)
 		i2c_md_write(md, REG_LCD_RST, 0);
 	return ret;
 }
@@ -263,8 +266,9 @@ static int panel_disable(struct drm_panel * panel)
 
 	DBG_PRINT("Disable panel");
 
-	/* i2c */
-	i2c_md_write(md, REG_PWM, 0);
+	/* Skip backlight off during shutdown/reboot to preserve DSI state */
+	if (system_state == SYSTEM_RUNNING)
+		i2c_md_write(md, REG_PWM, 0);
 
 	/* panel */
 	if (funcs && funcs->disable) {
@@ -471,11 +475,6 @@ static void i2c_md_shutdown(struct i2c_client *i2c)
 	struct i2c_mipi_dsi *md = i2c_get_clientdata(i2c);
 
 	DBG_PRINT("Shutdown I2C driver");
-
-	/* Set flag before DRM teardown so panel_unprepare() skips LCD reset.
-	 * Preserves DSI state across warm reboot so the GPU firmware
-	 * can reinitialize the display on the next boot. */
-	md->shutting_down = true;
 
 	tp_deinit(md);
 
