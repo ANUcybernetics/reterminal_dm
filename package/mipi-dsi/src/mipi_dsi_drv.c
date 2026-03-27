@@ -10,7 +10,6 @@
  */
 #include "mipi_dsi.h"
 #include <linux/version.h>
-#include <linux/reboot.h>
 
 static int dsi_status = DSI_OK; //0:dsi is ok, not 0:something wrong with dsi
 static ssize_t dsi_state_show(struct device *dev,
@@ -388,14 +387,32 @@ static int i2c_md_probe(struct i2c_client *i2c, const struct i2c_device_id *id)
 		return -ENODEV;
 	}
 
+	/* Wake STM32 before reading chip ID — after warm reboot, the STM32 may
+	 * be in a degraded state (returning 0x43 instead of 0xC3) until poked. */
+	i2c_md_write(md, REG_POWERON, 1);
+	msleep(50);
+
 	ret = i2c_md_read(md, REG_ID, NULL, 0);
 	if (ret < 0) {
 		dev_err(dev, "I2C read id failed: %d\n", ret);
 		return -ENODEV;
 	}
 	if (ret != 0xC3) {
-		dev_err(dev, "Unknown chip id: 0x%02x\n", ret);
-		return -ENODEV;
+		int retries;
+		for (retries = 0; retries < 3; retries++) {
+			msleep(100);
+			ret = i2c_md_read(md, REG_ID, NULL, 0);
+			if (ret == 0xC3)
+				break;
+		}
+		if (ret != 0xC3) {
+			if (ret == 0x43) {
+				dev_warn(dev, "STM32 returned degraded chip id 0x43 after warm reboot, continuing\n");
+			} else {
+				dev_err(dev, "Unknown chip id: 0x%02x\n", ret);
+				return -ENODEV;
+			}
+		}
 	}
 
 	ret = i2c_md_read(md, REG_TP_VERSION, mcu_img_ver, ARRAY_SIZE(mcu_img_ver));
@@ -404,8 +421,6 @@ static int i2c_md_probe(struct i2c_client *i2c, const struct i2c_device_id *id)
 		return -ENODEV;
 	}
 	DBG_FUNC("STM32 firmware version %u.%u", mcu_img_ver[0], mcu_img_ver[1]);
-
-	i2c_md_write(md, REG_POWERON, 1);
 
 	md->dsi = mipi_dsi_device(dev);
 	if (IS_ERR(md->dsi)) {
@@ -456,10 +471,14 @@ static void i2c_md_remove(struct i2c_client *i2c)
 
 	tp_deinit(md);
 
-	/* Turn off power */
-	i2c_md_write(md, REG_POWERON, 0);
-	i2c_md_write(md, REG_LCD_RST, 0);
-	i2c_md_write(md, REG_PWM, 0);
+	/* Turn off power only during normal operation, not during shutdown/reboot.
+	 * The STM32 stays powered on warm reboot; killing it here leaves the
+	 * GPU firmware with a dead panel on the next boot. */
+	if (system_state == SYSTEM_RUNNING) {
+		i2c_md_write(md, REG_POWERON, 0);
+		i2c_md_write(md, REG_LCD_RST, 0);
+		i2c_md_write(md, REG_PWM, 0);
+	}
 
 	// mipi_dsi_detach(md->dsi); // TODO: check if this is needed
 	drm_panel_remove(&md->panel);
