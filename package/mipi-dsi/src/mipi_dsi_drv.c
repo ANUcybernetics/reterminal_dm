@@ -392,6 +392,14 @@ static int i2c_md_probe(struct i2c_client *i2c, const struct i2c_device_id *id)
 	i2c_md_write(md, REG_POWERON, 1);
 	msleep(50);
 
+	/* Reset touch controller (Goodix behind STM32). Without this, the
+	 * Goodix may not set BUFFER_STATUS_READY after warm reboot, causing
+	 * the polling to never see touch events. */
+	i2c_md_write(md, REG_TP_RST, 0);
+	msleep(20);
+	i2c_md_write(md, REG_TP_RST, 1);
+	msleep(100);
+
 	ret = i2c_md_read(md, REG_ID, NULL, 0);
 	if (ret < 0) {
 		dev_err(dev, "I2C read id failed: %d\n", ret);

@@ -17,33 +17,26 @@ static int goodix_ts_read_input_report(struct i2c_mipi_dsi *md, u8 *data)
 	int header = GOODIX_STATUS_SIZE + GOODIX_CONTACT_SIZE;
 	int i, ret, touch_num;
 
-	for (i=0; i<2; i++) {
-		ret = i2c_md_read(md, REG_TP_STATUS, data, header);
-		if (ret < 0) {
+	ret = i2c_md_read(md, REG_TP_STATUS, data, header);
+	if (ret < 0)
+		return -EIO;
+
+	/* STM32 firmware v1.8 may report valid touch data without setting
+	 * GOODIX_BUFFER_STATUS_READY (bit 7). Accept data based on the
+	 * touch count in the lower nibble alone.
+	 * Always return touch_num (even 0) so that tp_poll_func() reports
+	 * finger-up events via input_mt_sync_frame(). */
+	touch_num = data[0] & 0x0f;
+
+	if (touch_num > TP_MAX_POINTS)
+		return -EPROTO;
+
+	if (touch_num > 1) {
+		ret = i2c_md_read(md, REG_TP_POINT, data+header, (touch_num-1)*GOODIX_CONTACT_SIZE);
+		if (ret < 0)
 			return -EIO;
-		}
-
-		if (data[0] & GOODIX_BUFFER_STATUS_READY) {
-			touch_num = data[0] & 0x0f;
-			if (touch_num > TP_MAX_POINTS)
-				return -EPROTO;
-
-			if (touch_num > 1) {
-				ret = i2c_md_read(md, REG_TP_POINT, data+header, (touch_num-1)*GOODIX_CONTACT_SIZE);
-				if (ret < 0)
-					return -EIO;
-			}
-			return touch_num;
-		}
-
-		usleep_range(3000, 5000); /* Poll every 3 - 5 ms */
 	}
-
-	/*
-	 * The Goodix panel will send spurious interrupts after a
-	 * 'finger up' event, which will always cause a timeout.
-	 */
-	return -ENOMSG;
+	return touch_num;
 }
 
 //TODO
