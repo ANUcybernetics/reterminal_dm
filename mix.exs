@@ -1,8 +1,8 @@
-defmodule NervesSystemRpi4.MixProject do
+defmodule ReterminalDm.MixProject do
   use Mix.Project
 
   @github_organization "ANUcybernetics"
-  @app :frio_rpi4
+  @app :reterminal_dm
   @source_url "https://github.com/#{@github_organization}/#{@app}"
   @version Path.join(__DIR__, "VERSION")
            |> File.read!()
@@ -75,7 +75,7 @@ defmodule NervesSystemRpi4.MixProject do
   end
 
   defp description do
-    "ANUcybernetics Nerves System - Raspberry Pi 4 / reTerminal DM (64-bits)"
+    "ANUcybernetics Nerves System for the reTerminal DM (Raspberry Pi CM4, 64-bit)"
   end
 
   defp docs do
