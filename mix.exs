@@ -1,7 +1,7 @@
 defmodule NervesSystemRpi4.MixProject do
   use Mix.Project
 
-  @github_organization "formrausch"
+  @github_organization "ANUcybernetics"
   @app :frio_rpi4
   @source_url "https://github.com/#{@github_organization}/#{@app}"
   @version Path.join(__DIR__, "VERSION")
@@ -12,8 +12,7 @@ defmodule NervesSystemRpi4.MixProject do
     [
       app: @app,
       version: @version,
-      # Because we're using OTP 27, we need to enforce Elixir 1.17 or later.
-      elixir: "~> 1.17",
+      elixir: "~> 1.19",
       compilers: Mix.compilers() ++ [:nerves_package],
       nerves_package: nerves_package(),
       description: description(),
@@ -68,7 +67,7 @@ defmodule NervesSystemRpi4.MixProject do
   defp deps do
     [
       {:nerves, "~> 1.11", runtime: false},
-      {:nerves_system_br, "1.28.3", runtime: false},
+      {:nerves_system_br, "1.33.4", runtime: false},
       {:nerves_toolchain_aarch64_nerves_linux_gnu, "~> 13.2.0", runtime: false},
       {:nerves_system_linter, "~> 0.4", only: [:dev, :test], runtime: false},
       {:ex_doc, "~> 0.22", only: :docs, runtime: false}
@@ -76,7 +75,7 @@ defmodule NervesSystemRpi4.MixProject do
   end
 
   defp description do
-    "Formrausch.io Nerves System - Raspberry Pi 4 (64-bits)"
+    "ANUcybernetics Nerves System - Raspberry Pi 4 / reTerminal DM (64-bits)"
   end
 
   defp docs do
@@ -103,7 +102,8 @@ defmodule NervesSystemRpi4.MixProject do
       "fwup_include",
       "rootfs_overlay",
       "CHANGELOG.md",
-      "cmdline.txt",
+      "cmdline-a.txt",
+      "cmdline-b.txt",
       "config.txt",
       "fwup-ops.conf",
       "fwup.conf",
