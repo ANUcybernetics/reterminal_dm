@@ -1,0 +1,73 @@
+/*
+ * reTerminal DM CAN overlay: MCP251XFD controller on SPI0 CE0.
+ *
+ * Disables spidev0 (CE0) so the CAN controller can claim it.
+ * Omit this overlay from config.txt to free SPI0 CE0 for general use.
+ *
+ * Requires: dtparam=spi=on in config.txt.
+ *
+ * Copyright (C) 2021 Seeed Studio
+ * Zhangqun Ming <north_sea@qq.com>
+ *
+ * MIT License
+ */
+/dts-v1/;
+/plugin/;
+
+/ {
+    compatible = "brcm,bcm2835", "brcm,bcm2708", "brcm,bcm2709", "brcm,bcm2711";
+
+	fragment@0 {
+			target = <&spidev1>;
+			__overlay__ {
+					status = "okay";
+			};
+	};
+
+	fragment@1 {
+			target = <&spidev0>;
+			__overlay__ {
+					status = "disabled";
+			};
+	};
+
+	fragment@2 {
+			target = <&gpio>;
+			__overlay__ {
+					mcp251xfd_pins_0: mcp251xfd_spi0_0_pins {
+							brcm,pins = <12>;
+							brcm,function = <0>;//BCM2835_FSEL_GPIO_IN
+					};
+			};
+	};
+
+	fragment@3 {
+			target-path = "/clocks";
+			__overlay__ {
+					clk_mcp251xfd_osc_0: mcp251xfd-spi0-0-osc {
+							#clock-cells = <0>;
+							compatible = "fixed-clock";
+							clock-frequency = <40000000>;
+					};
+			};
+	};
+
+	fragment@4 {
+			target = <&spi0>;
+			__overlay__ {
+					status = "okay";
+					#address-cells = <1>;
+					#size-cells = <0>;
+					mcp251xfd@0 {
+							compatible = "microchip,mcp251xfd";
+							reg = <0>;
+							pinctrl-names = "default";
+							pinctrl-0 = <&mcp251xfd_pins_0>;
+							spi-max-frequency = <20000000>;
+							interrupt-parent = <&gpio>;
+							interrupts = <12 8>;//IRQ_TYPE_LEVEL_LOW
+							clocks = <&clk_mcp251xfd_osc_0>;
+					};
+			};
+	};
+};

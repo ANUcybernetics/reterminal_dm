@@ -1,0 +1,229 @@
+/*
+ * reTerminal DM base overlay: core hardware support.
+ *
+ * DSI display, Goodix touchscreen, PCA9535 GPIO expander, RTC, EEPROMs,
+ * LTR303 light sensor, LEDs, PWM backlight.
+ *
+ * Split from the monolithic reTerminal-plus.dts so that CAN and audio
+ * can be loaded (or omitted) independently via config.txt.
+ *
+ * Copyright (C) 2021 Seeed Studio
+ * Zhangqun Ming <north_sea@qq.com>
+ *
+ * MIT License
+ */
+/dts-v1/;
+/plugin/;
+
+/ {
+    compatible = "brcm,bcm2835", "brcm,bcm2708", "brcm,bcm2709", "brcm,bcm2711";
+
+    fragment@0 {
+        target-path="/";
+        __overlay__ {
+            hardware = "reTerminal plus V1.0";
+        };
+    };
+
+	fragment@1 {
+		target = <&i2c1>;
+		__overlay__ {
+			status = "okay";
+
+			/* this is the configuration part */
+			clock-frequency = <400000>;
+
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			pcf857x: pcf@21 {
+				compatible = "nxp,pca9535";
+				reg = <0x21>;
+				status = "okay";
+
+				gpio-controller;
+				#gpio-cells = <2>;
+				#interrupt-cells=<2>;
+				interrupt-parent = <&gpio>;
+				interrupts = <6 2>; /* IRQ_TYPE_EDGE_FALLING */
+				interrupt-controller;
+			};
+
+			ltr303@29 {
+				compatible = "liteon,ltr303";
+				reg = <0x29>;
+				status = "okay";
+			};
+
+		};
+	};
+
+	fragment@2 {
+		target = <&gpio>;
+		__overlay__ {
+
+			pcf857x_pins: pcf857x_pins@21 {
+				brcm,pins = <6>;     /* gpio number */
+				brcm,function = <0>; /* 0 = input, 1 = output */
+				brcm,pull = <2>;     /* 0 = none, 1 = pull down, 2 = pull up */
+			};
+
+			pwm_pins: pwm_pins {
+				brcm,pins = <13>;
+				brcm,function = <4>; // ALT0
+			};
+
+			tp_int_pin: tp_int_pin {
+				brcm,pins = <27>;     /* gpio number */
+				brcm,function = <0>; /* 0 = input, 1 = output */
+				brcm,pull = <0>;     /* 0 = none, 1 = pull down, 2 = pull up */
+			};
+		};
+	};
+
+	fragment@3 {
+		target = <&dsi1>;
+		__overlay__ {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			status = "okay";
+
+			port {
+				dsi_out_port: endpoint {
+					remote-endpoint = <&panel_dsi_port>;
+				};
+			};
+			mipi_dsi: mipi_dsi@45 {
+				compatible = "gjx,gjx101c7";
+				reg = <0>;
+
+				backlight = <&lcd_backlight>;
+				reset-gpios=<&pcf857x 15 1>;
+
+				port {
+					panel_dsi_port: endpoint {
+						remote-endpoint = <&dsi_out_port>;
+					};
+				};
+			};
+		};
+	};
+
+	fragment@4 {
+		target = <&i2c3>;
+		__overlay__ {
+			status = "okay";
+
+			/* this is the configuration part */
+			clock-frequency = <100000>;
+
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			pcf8563w@51 {
+				compatible = "nxp,pcf8563w";
+				reg = <0x51>;
+				reset-source;
+				/* 0 = 4096Hz, 1 = 64Hz, 2 = 1Hz, 3 = 1/60Hz */
+				timer-frequency = <0x02>;
+				/* Timeout count, max 255 min 2*/
+				default-timeout =  <120>;
+				min-hw-heartbeat-ms = <2000>;
+			};
+
+			eeprom@50 {
+				compatible = "atmel,24c32";
+				reg = <0x50>;
+			};
+
+			eeprom@57 {
+				compatible = "atmel,24c256";
+				reg = <0x57>;
+			};
+		};
+	};
+
+	fragment@5 {
+		target = <&leds>;
+		__overlay__ {
+			compatible = "gpio-leds";
+
+                        lcd_pwr_en: lcd_pwr_en {
+                                label = "lcd-pwr";
+                                linux,default-trigger = "default-off";
+                                gpios = <&pcf857x 8 0>;
+                                default-state = "on";
+                        };
+
+			usr_led10: usr_led10 {
+				label = "usr-led";
+				linux,default-trigger = "default-off";
+				gpios = <&pcf857x 9 0>;
+				default-state = "off";
+			};
+
+			usr_buzzer: usr_buzzer {
+				label = "usr-buzzer";
+				linux,default-trigger = "default-off";
+				gpios = <&pcf857x 11 0>;
+				default-state = "off";
+			};
+
+			audio_pwr_en: audio_pwr_en {
+					label = "audio-pwr";
+					linux,default-trigger = "default-off";
+					gpios = <&pcf857x 12 0>;
+					default-state = "on";
+			};
+		};
+	};
+
+	fragment@6 {
+			target = <&pwm>;
+			frag1: __overlay__ {
+					pinctrl-names = "default";
+					pinctrl-0 = <&pwm_pins>;
+					assigned-clock-rates = <1000000>;
+					status = "okay";
+			};
+	};
+
+	fragment@7 {
+			target-path = "/";
+			__overlay__ {
+					lcd_backlight: lcd_backlight {
+							compatible = "pwm-backlight";
+							brightness-levels = <96 128 160 192 224 255>;
+							default-brightness-level = <4>;
+							pwms = <&pwm 1 200000 0>;
+							power-supply = <&vdd_3v3_reg>;
+							status = "okay";
+					};
+			};
+	};
+
+	fragment@8 {
+		target = <&i2c_csi_dsi>; // The TP and CSI shared with the same I2C0 bus.
+		__overlay__ {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			status = "okay";
+
+			 gt9271: gt9271@5d {
+				compatible = "goodix,gt9271";
+				reg = <0x5d>;
+				pinctrl-names = "default";
+				pinctrl-0 = <&tp_int_pin>;
+				interrupt-parent = <&gpio>;
+				interrupts = <27 2>; // high-to-low edge triggered
+				irq-gpios = <&gpio 27 0>;
+				reset-gpios = <&pcf857x 7 0>;
+				touchscreen-inverted-y;
+				touchscreen-swapped-x-y;
+			};
+		};
+	};
+
+	__overrides__ {
+	};
+};
